@@ -3,3 +3,5 @@ casts/
 videos/
 __pycache__/
 .env
+anim/media/
+anim/__pycache__/
