@@ -8,3 +8,5 @@ anim/__pycache__/
 gravacoes/
 saida/
 target/
+audio/
+.venv-asr/
