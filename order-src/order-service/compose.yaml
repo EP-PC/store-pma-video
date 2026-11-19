@@ -1,0 +1,37 @@
+# Teste local do order sozinho (Postgres + order na 8080), sem gateway nem product.
+# Sem o product de pe, o POST /orders com itens validos responde 503 (Product service unavailable).
+# Antes de subir: "docker compose down" (sem -v) em qualquer outro compose "store"
+# (mesmo nome de projeto, mesma porta 8080 e mesmo volume store_db-data).
+name: store
+
+services:
+  db:
+    image: postgres:17
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USER:-store}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-store}
+      POSTGRES_DB: ${DB_NAME:-store}
+
+  # cache do order (bottleneck 1): precos do Product e cotacoes do Exchange, com TTL de 60 s
+  order-redis:
+    image: redis:7.4-alpine
+
+  order:
+    build: .
+    ports:
+      - 8080:8080
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: ${DB_NAME:-store}
+      DATABASE_USERNAME: ${DB_USER:-store}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-store}
+      REDIS_HOST: order-redis
+    depends_on:
+      - db
+      - order-redis
+
+volumes:
+  db-data:

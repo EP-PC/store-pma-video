@@ -33,6 +33,17 @@ jobs:
           } > .env
           echo "ADMIN_EMAIL=admin@store.dev" >> "$GITHUB_ENV"
           echo "ADMIN_PASS=$pass" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: build do order (contratos product e order + order-service)
+        run: |
+          (cd order-src/product && mvn -B -q -DskipTests install)
+          (cd order-src/order && mvn -B -q -DskipTests install)
+          (cd order-src/order-service && mvn -B -q -DskipTests package)
+          ls order-src/order-service/target/*.jar
       - name: sobe a loja
         run: |
           docker compose up -d --build --quiet-pull
@@ -53,9 +64,11 @@ jobs:
       - name: grava o Grafana com tráfego
         run: |
           docker run -d --name trafego --network store_default \
-            -v "$PWD/observability/traffic.py:/traffic.py:ro" -e DURATION=160 -e CURRENCY=1 \
+            -v "$PWD/observability/traffic.py:/traffic.py:ro" -e DURATION=170 -e CURRENCY=1 \
             python:3.13-alpine python -u /traffic.py
-          sleep 50
+          sleep 60
+          curl -s 'localhost:9090/api/v1/targets' | jq -r '.data.activeTargets[] | .labels.job + " " + .health + " " + (.lastError // "")'
+          curl -s 'localhost:9090/api/v1/query?query=sum(rate(http_server_requests_seconds_count[1m]))' | jq -c '.data.result'
           python scripts/browser.py grafana 80
           ffmpeg -loglevel error -y -i videos/grafana.webm -c:v libx264 -crf 18 -pix_fmt yuv420p videos/grafana.mp4
           docker logs trafego | tail -20

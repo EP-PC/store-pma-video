@@ -47,8 +47,10 @@ services:
   order-redis:
     image: redis:7.4-alpine
 
+  # buildado do código atual do Order-service: a imagem publicada (1eb5bd1) é anterior às
+  # métricas do Prometheus (commit 845ce0f), e sem elas o painel do Grafana fica vazio
   order:
-    image: enzoperego/order:1eb5bd1
+    build: ./order-src/order-service
     environment:
       DATABASE_HOST: db
       DATABASE_PORT: 5432

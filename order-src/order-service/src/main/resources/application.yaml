@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: order
+
+  datasource:
+    url: jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_DB}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    baseline-on-migrate: true
+    schemas: orders
+
+  # Bottleneck 1 (caching): Redis proprio do order (ver CacheConfig).
+  # Timeouts curtos: com o Redis fora do ar, o order segue sem cache (CacheErrorHandler)
+  # e cada requisicao perde no maximo ~0,5 s tentando, em vez de travar.
+  data:
+    redis:
+      host: ${REDIS_HOST:order-redis}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 500ms
+      timeout: 500ms
+
+  cache:
+    type: redis
+    redis:
+      # contadores de hit/miss do cache (aparecem nas metricas da observabilidade)
+      enable-statistics: true
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          # vale para os dois clientes (product e exchange). O padrao do Feign espera ate 60 s
+          # pela resposta: um servico travado prenderia a requisicao do usuario esse tempo todo.
+          # Estourou o tempo -> FeignException com status -1 -> 503 no OrderService.
+          default:
+            connect-timeout: 2000
+            read-timeout: 5000
+
+  jpa:
+    # sem sessao aberta durante a requisicao inteira: a conexao volta ao pool logo apos
+    # cada consulta (o GET /orders/{id} chama o Exchange depois de ler o banco)
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: orders
+
+# Bottleneck 2 (observabilidade): metricas para o Prometheus em GET :8081/actuator/prometheus.
+# Porta separada de proposito: o gateway so encaminha /orders/** para a 8080, entao as metricas
+# nunca ficam acessiveis de fora; so o Prometheus (rede interna) le a 8081.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
+  metrics:
+    # histograma de latencia por endpoint e por chamada Feign: permite calcular p95/p99 no Prometheus
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+    tags:
+      application: order
