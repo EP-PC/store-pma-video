@@ -54,21 +54,39 @@ def dur(f):
 # ---------------------------------------------------------------- áudio
 
 def blocos_de_uma_tomada(audio):
-    """Corta nos meios das 8 maiores pausas (>= 1 s)."""
+    """Acha as 8 maiores pausas (>= 1 s), corta a fala de cada bloco e junta com um respiro curto."""
     err = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(audio), "-af",
                           "silencedetect=noise=-35dB:d=1.0", "-f", "null", "-"],
                          capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
     ini = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
     fim = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
     total = dur(audio)
-    pausas = [(b - a, (a + b) / 2) for a, b in zip(ini, fim) if a > 0.5 and b < total - 0.5]
+    pausas = [(b - a, a, b) for a, b in zip(ini, fim) if a > 0.5 and b < total - 0.5]
     if len(pausas) < 8:
         sys.exit(f"achei só {len(pausas)} pausas de 1 s ou mais; preciso de 8 (uma entre cada bloco)")
     if len(pausas) > 8:
         print(f"aviso: {len(pausas)} pausas; uso as 8 mais longas")
-    cortes = sorted(m for _, m in sorted(pausas, reverse=True)[:8])
-    pontos = [0.0] + cortes + [total]
-    return [b - a for a, b in zip(pontos, pontos[1:])], audio
+    escolhidas = sorted(sorted(pausas, reverse=True)[:8], key=lambda x: x[1])
+    # silêncio do começo e do fim do arquivo
+    comeco = fim[0] if ini and ini[0] <= 0.05 else 0.0
+    final = ini[-1] if ini and len(fim) < len(ini) else total
+    falas, pos = [], comeco
+    for _, a, b in escolhidas:
+        falas.append((max(0.0, pos - 0.1), a + 0.25))
+        pos = b
+    falas.append((max(0.0, pos - 0.1), min(total, final + 0.25)))
+    OUT.mkdir(exist_ok=True)
+    partes = []
+    for i, (a, b) in enumerate(falas):
+        p = OUT / f"voz{i}.wav"
+        run(["ffmpeg", "-y", "-i", str(audio), "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
+             "-af", "apad=pad_dur=0.35", "-ar", "48000", "-ac", "1", str(p)])
+        partes.append(p)
+    lista = OUT / "audios.txt"
+    lista.write_text("".join(f"file '{p.name}'\n" for p in partes), encoding="utf-8")
+    junto = OUT / "voz.wav"
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(junto)])
+    return [dur(p) for p in partes], junto
 
 
 def blocos_de_arquivos(pasta):
@@ -81,7 +99,7 @@ def blocos_de_arquivos(pasta):
     partes = []
     for i, a in enumerate(arqs):
         p = OUT / f"voz{i}.wav"
-        run(["ffmpeg", "-y", "-i", str(a), "-af", "apad=pad_dur=0.5", "-ar", "48000", "-ac", "1", str(p)])
+        run(["ffmpeg", "-y", "-i", str(a), "-af", "apad=pad_dur=0.35", "-ar", "48000", "-ac", "1", str(p)])
         partes.append(p)
     lista.write_text("".join(f"file '{p.name}'\n" for p in partes), encoding="utf-8")
     junto = OUT / "voz.wav"

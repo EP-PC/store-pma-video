@@ -1,37 +1,37 @@
 # Roteiro para gravar a narração
 
-**Como gravar:** leia os 9 blocos em ordem, no seu ritmo, e deixe **uns 2 segundos de silêncio
-entre um bloco e outro** (é por essas pausas que eu corto e encaixo cada cena). Pode ser numa
-tomada só ou um arquivo por bloco. Qualquer gravador serve (Gravador de Voz do Windows, celular).
-Salve em `store-pma-video/audio/`. Total esperado: ~1 min 50 s (~270 palavras).
+**Como gravar:** leia os 9 blocos em ordem, como se estivesse explicando pra alguém, e deixe
+**uns 2 segundos de silêncio entre um bloco e outro** (eu corto essas pausas na montagem; elas só
+servem pra eu achar onde cada cena começa). Uma tomada só ou um arquivo por bloco. Salve em
+`store-pma-video/audio/`. Fale no seu jeito: troque palavras à vontade, só mantenha os números.
 
-Pode trocar palavras para soar natural; só mantenha os números.
+~310 palavras, ~2 minutos.
 
 ---
 
-**1 · Abertura** (tela: título e nomes)
-> Esse é o store-pma, uma loja de produtos feita de microsserviços. Grupo 05: eu, Pedro Garcia, o Pedro e o Enzo.
+**1 · Abertura** · tela: título e nomes
+> Oi, eu sou o Pedro Garcia, e esse é o store-pma, a loja online que o grupo 05 montou inteira em microsserviços.
 
-**2 · Arquitetura** (tela: diagrama dos serviços, depois a AWS e o CI/CD)
-> Tudo entra por um gateway, o único serviço exposto: ele valida o login no auth e repassa quem é o usuário. Account, product e order são em Java; o exchange, que eu fiz, é em Python e busca a cotação no Banco Central. Na AWS isso roda num EKS com dois nós e o banco no RDS, e cada push passa pelo Jenkins até o deploy.
+**2 · Como funciona** · tela: diagrama dos serviços, depois a AWS e o Jenkins
+> Toda requisição entra pelo gateway, que é a única porta aberta pra fora. Ele confere o login no auth e repassa quem é o usuário. Atrás dele estão o account, o product e o order, em Java, e o exchange, que foi a minha parte, em Python. Na AWS tudo roda num EKS, com o banco no RDS, e o Jenkins faz o deploy sozinho a cada push.
 
-**3 · A loja funcionando** (tela: terminal com as requisições pelo gateway)
-> Essa é a loja rodando de verdade. Sem login, o gateway barra. A Ana se cadastra e entra; tenta cadastrar um produto e leva 403, porque só o admin pode. Ela faz um pedido de 119 dólares, e o mesmo pedido sai em reais: o order chamou o exchange. Moeda que não existe dá 422.
+**3 · A loja funcionando** · tela: terminal com as requisições
+> Agora a loja rodando de verdade. Sem login, o gateway barra. A Ana cria a conta e entra, mas cadastrar produto ela não pode: dá 403, isso é coisa de admin. Aí ela faz um pedido, e quando pede o valor em reais, o order chama o exchange e converte na hora. Moeda inventada dá 422.
 
-**4 · Kubernetes e HPA** (tela: pods subindo; depois 3 painéis com o HPA)
-> Os mesmos manifestos do EKS num cluster de teste: os pods sobem e só recebem tráfego quando o health-check responde. Com carga, a CPU do gateway passa de 160% do alvo e o HPA sobe de uma para quatro réplicas.
+**4 · Kubernetes e teste de carga** · tela: pods subindo, depois o HPA
+> No Kubernetes são os mesmos arquivos do EKS, e o pod só recebe tráfego quando o health-check responde. No teste de carga, a CPU do gateway estoura e o HPA sobe de uma pra quatro réplicas sozinho.
 
-**5 · Bottlenecks do grupo** (tela: tabela com os 6 bottlenecks)
-> Cada um resolveu dois gargalos. O Pedro colocou HPA, que cortou o p95 de 770 para 320 milissegundos, e readiness probe, que acabou com os 40 segundos de erro em cada deploy. O Enzo colocou Redis no order e Prometheus com Grafana.
+**5 · Os gargalos do grupo** · tela: tabela com os 6 bottlenecks
+> Cada um atacou dois gargalos. O Pedro fez esse HPA, que derrubou a latência de 770 pra 320 milissegundos, e a readiness probe, que acabou com o erro no deploy. O Enzo colocou cache com Redis e monitoramento com Prometheus e Grafana.
 
-**6 · Grafana** (tela: painel do order com tráfego)
-> Aqui o painel dele com tráfego de verdade: requisições, latência e o acerto do cache.
+**6 · Grafana** · tela: painel do order
+> Esse é o painel dele, com tráfego de verdade passando.
 
-**7 · Os meus bottlenecks** (tela: benchmark do cache; depois pip-audit e Trivy)
-> Os meus foram no exchange. O cache levou a cotação de uns 800 milissegundos para 4, com duas chamadas ao Banco Central em vez de cem. E a varredura de vulnerabilidades: o Trivy barrou a imagem com duas falhas graves, eu corrigi no Dockerfile e ela passou.
+**7 · Os meus gargalos** · tela: benchmark do cache, depois o Trivy
+> Os meus foram no exchange. O cache guarda a cotação, então em vez de ir no Banco Central toda vez, a resposta caiu de uns 800 milissegundos pra 4. E no pipeline, o Trivy achou duas falhas graves na imagem; eu corrigi e agora ela passa.
 
-**8 · Custos** (tela: custo por hora e SLA)
-> Na AWS isso custa uns 34 centavos de dólar por hora, então a gente sobe e derruba com um script. O ponto fraco de disponibilidade é o banco numa zona só.
+**8 · Custos** · tela: custo por hora e SLA
+> Ligado na AWS, isso custa uns 34 centavos de dólar por hora, então a gente sobe e derruba com um script. O ponto fraco é o banco numa zona só.
 
-**9 · Fecho** (tela: conclusão e link da documentação)
-> Está tudo documentado no MkDocs. A loja funciona de ponta a ponta, e os próximos passos são banco Multi-AZ, mais réplicas e autoscaling do cluster.
+**9 · Fecho** · tela: site da documentação e conclusão
+> Tá tudo documentado no MkDocs. A loja funciona de ponta a ponta, e o próximo passo seria deixar o banco e o cluster mais resistentes a falha. Valeu!
