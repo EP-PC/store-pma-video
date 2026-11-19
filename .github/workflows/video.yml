@@ -101,9 +101,6 @@ jobs:
           trivy image --download-db-only --quiet
           docker build -q -t exchange:antes -f exchange/Dockerfile.antes exchange
           docker build -q -t exchange:scan exchange
-          trivy image --quiet --format json --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed exchange:scan | jq -r '.Results[] | select(.Vulnerabilities) | .Target as $t | .Vulnerabilities[] | [$t, .PkgName, .PkgPath, .VulnerabilityID] | @tsv'
-          trivy image --quiet --format json --list-all-pkgs --scanners vuln exchange:scan | jq -r '.Results[] | .Target as $t | (.Packages // [])[] | select(.Name=="setuptools") | [$t, .Version, .FilePath // "-", (.Layer.DiffID // "-")] | @tsv'
-          docker run --rm --entrypoint sh exchange:scan -c 'find / -xdev \( -iname "setuptools*" -o -name "*.whl" \) 2>/dev/null | head -20; pip list 2>/dev/null | grep -i setuptools'
       - name: grava
         run: |
           mkdir -p casts videos

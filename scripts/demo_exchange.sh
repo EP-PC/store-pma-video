@@ -38,7 +38,7 @@ security)
   run "pip-audit --progress-spinner off -r requirements.txt" 3
   note "Trivy na imagem como estava: barra HIGH/CRITICAL com correção disponível"
   run "trivy image --quiet --table-mode detailed --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 exchange:antes; echo \"exit code: \$?\"" 4
-  note "corrigido no Dockerfile: apt-get upgrade (patch do Debian) + setuptools atualizado"
+  note "corrigido no Dockerfile: apt-get upgrade (patch do Debian) e imagem final sem o pip"
   run "trivy image --quiet --table-mode detailed --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 exchange:scan; echo \"exit code: \$?\"" 4
   ;;
 

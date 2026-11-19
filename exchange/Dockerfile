@@ -25,7 +25,9 @@ RUN pytest -q && pip-audit --strict -r requirements.txt
 
 FROM base AS final
 COPY main.py ptax.py ./
-RUN useradd --uid 10001 --no-create-home app
+# o pip não é usado em produção e carrega dentro dele um pedaço do setuptools 70.3.0
+# (pip/_vendor), que o Trivy aponta como CVE-2025-47273: sai da imagem final
+RUN python -m pip uninstall -y pip && useradd --uid 10001 --no-create-home app
 USER 10001
 EXPOSE 8080
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
