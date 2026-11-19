@@ -15,9 +15,9 @@ run "kubectl apply -f k8s/account.yaml -f k8s/auth.yaml -f k8s/product.yaml -f k
 note "as probes chamam /<serviço>/health-check: o pod só recebe tráfego quando está pronto"
 type_cmd "kubectl get pods   # atualiza a cada 3 s"
 for i in $(seq 1 160); do
-  printf '\e[H\e[2J'
-  printf '\e[38;5;110m$\e[0m kubectl get pods \e[38;5;245m(atualiza a cada 3 s · %ds)\e[0m\n\n' $((i * 3))
-  kubectl get pods
+  # busca antes e desenha tudo de uma vez: limpar a tela e esperar o kubectl deixava um quadro vazio
+  out=$(kubectl get pods 2>&1)
+  printf '\e[H\e[2J\e[38;5;110m$\e[0m kubectl get pods \e[38;5;245m(atualiza a cada 3 s · %ds)\e[0m\n\n%s\n' $((i * 3)) "$out"
   total=$(kubectl get pods --no-headers | wc -l)
   prontos=$(kubectl get pods --no-headers | awk '{split($2, a, "/"); if (a[1] == a[2] && $3 == "Running") n++} END {print n + 0}')
   [ "$total" -gt 0 ] && [ "$prontos" -eq "$total" ] && break
