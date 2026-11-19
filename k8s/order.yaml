@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order
+  template:
+    metadata:
+      labels:
+        app: order
+    spec:
+      containers:
+          - name: order
+            # a tag e o commit do codigo (imagem publicada para linux/amd64 e linux/arm64)
+            image: enzoperego/order:1eb5bd1
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+              # metricas do Prometheus (bottleneck 2): fora do Service, so para scrape interno
+              - containerPort: 8081
+                name: metrics
+            # o site da disciplina pede que as probes chamem GET /<servico>/health-check (200 enquanto
+            # o servico esta de pe, sem expor nada interno). Sem probe, o pod novo seria dado como
+            # pronto assim que o container subisse e o antigo cairia: 503 nos segundos de boot do
+            # Spring. O endpoint so responde no fim da inicializacao (depois do Flyway/contexto).
+            readinessProbe:
+              httpGet:
+                path: /orders/health-check
+                port: 8080
+              initialDelaySeconds: 20
+              periodSeconds: 5
+              failureThreshold: 6
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            env:
+
+              - name: DATABASE_HOST
+                valueFrom:
+                  configMapKeyRef:
+                    name: postgres-configmap
+                    key: POSTGRES_HOST
+
+              - name: DATABASE_DB
+                valueFrom:
+                  configMapKeyRef:
+                    name: postgres-configmap
+                    key: POSTGRES_DB
+
+              - name: DATABASE_PORT
+                value: "5432"
+
+              - name: DATABASE_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-secrets
+                    key: POSTGRES_USER
+
+              - name: DATABASE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-secrets
+                    key: POSTGRES_PASSWORD
+
+              # cache (bottleneck 1): Redis proprio do order, definido mais abaixo neste arquivo
+              - name: REDIS_HOST
+                value: "order-redis"
+
+              # heap de ate 50% do limite (256 MB de 512Mi); sobra para metaspace/threads
+              - name: JAVA_TOOL_OPTIONS
+                value: "-XX:MaxRAMPercentage=50"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: order
+spec:
+  selector:
+    app: order
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+
+# Redis do order (bottleneck 1: caching). So cache, com TTL de 60 s: sem volume nem senha,
+# e o Service e ClusterIP (so os pods do cluster alcancam). Se ele cair, o order segue
+# funcionando sem cache (CacheErrorHandler no CacheConfig).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-redis
+  template:
+    metadata:
+      labels:
+        app: order-redis
+    spec:
+      containers:
+          - name: order-redis
+            image: redis:7.4-alpine
+            # limita a memoria do proprio Redis abaixo do limite do container e descarta as
+            # chaves menos usadas quando enche (cache: perder chave so custa uma consulta a mais)
+            args: ["--maxmemory", "96mb", "--maxmemory-policy", "allkeys-lru"]
+            ports:
+              - containerPort: 6379
+            readinessProbe:
+              tcpSocket:
+                port: 6379
+              initialDelaySeconds: 2
+              periodSeconds: 5
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "200m"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-redis
+spec:
+  selector:
+    app: order-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP

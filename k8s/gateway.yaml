@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+spec:
+  # professor usa 5; aqui 1 por falta de RAM no Minikube.
+  # Escalar: kubectl scale deployment gateway --replicas=N
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+          - name: gateway
+            image: pedrohmm1/gateway:3
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+            # sem probe, o pod novo conta como pronto assim que o container sobe
+            # e o antigo cai antes do Spring terminar (~40 s de 503 no deploy).
+            # A 8080 (Netty) so abre no fim da inicializacao do contexto, entao
+            # o teste TCP basta: sem actuator e sem mudar codigo.
+            readinessProbe:
+              tcpSocket:
+                port: 8080
+              initialDelaySeconds: 20
+              periodSeconds: 5
+              failureThreshold: 6
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            env:
+
+              # sem Secret: o gateway nao conhece a chave JWT, valida o cookie
+              # chamando o auth. AUTH_SOLVE_URL e CORS_ALLOWED_ORIGINS usam o
+              # default do application.yaml (http://auth:8080/auth/solve).
+
+              # heap de ate 50% do limite (256 MB de 512Mi); sobra para metaspace/threads
+              - name: JAVA_TOOL_OPTIONS
+                value: "-XX:MaxRAMPercentage=50"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+spec:
+  selector:
+    app: gateway
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  # unico Service exposto; no Minikube precisa de "minikube tunnel"
+  type: LoadBalancer

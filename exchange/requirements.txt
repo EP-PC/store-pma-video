@@ -1,0 +1,4 @@
+# dependências do serviço (versões fixas: a imagem e o pip-audit sempre veem as mesmas)
+fastapi==0.165.0
+uvicorn==0.54.0
+httpx==0.28.1

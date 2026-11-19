@@ -1,0 +1,181 @@
+name: gravar cenas
+on:
+  workflow_dispatch:
+    inputs:
+      cenas:
+        description: "jobs a rodar (app, exchange, k8s, docs), separados por vírgula"
+        default: "app,exchange,k8s,docs"
+
+jobs:
+
+  # ---------------------------------------------------------------- loja inteira + Grafana
+  app:
+    if: contains(inputs.cenas, 'app')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/setup-render.sh
+      - name: HTTPie e Playwright
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install -q httpie playwright
+          /tmp/venv/bin/playwright install --with-deps chromium >/dev/null
+          echo /tmp/venv/bin >> "$GITHUB_PATH"
+      - name: segredos de demonstração (aleatórios, só deste job)
+        run: |
+          pass=$(openssl rand -hex 12)
+          echo "::add-mask::$pass"
+          {
+            echo "JWT_SECRET_KEY=$(openssl rand -base64 32)"
+            echo "ACCOUNT_ADMIN_EMAIL=admin@store.dev"
+            echo "ACCOUNT_ADMIN_HASH=$(printf '%s' "$pass" | openssl dgst -sha256 -binary | base64)"
+          } > .env
+          echo "ADMIN_EMAIL=admin@store.dev" >> "$GITHUB_ENV"
+          echo "ADMIN_PASS=$pass" >> "$GITHUB_ENV"
+      - name: sobe a loja
+        run: |
+          docker compose up -d --build --quiet-pull
+          for i in $(seq 1 90); do
+            ok=0
+            for p in products orders/health-check exchange/health-check auth/health-check; do
+              [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/$p)" = 200 ] && ok=$((ok+1))
+            done
+            [ $ok -eq 4 ] && break
+            sleep 5
+          done
+          docker compose ps
+      - name: grava a demo
+        run: |
+          mkdir -p casts videos
+          python3 scripts/rec.py casts/app.cast 112 26 bash scripts/demo_app.sh
+          bash scripts/render.sh casts/app.cast videos/app.mp4 27 3
+      - name: grava o Grafana com tráfego
+        run: |
+          docker run -d --name trafego --network store_default \
+            -v "$PWD/observability/traffic.py:/traffic.py:ro" -e DURATION=160 -e CURRENCY=1 \
+            python:3.13-alpine python -u /traffic.py
+          sleep 50
+          python scripts/browser.py grafana 80
+          ffmpeg -loglevel error -y -i videos/grafana.webm -c:v libx264 -crf 18 -pix_fmt yuv420p videos/grafana.mp4
+          docker logs trafego | tail -20
+      - if: failure()
+        run: docker compose logs --tail 80
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: app
+          path: |
+            videos/*.mp4
+            casts/
+
+  # ---------------------------------------------------------------- Exchange: testes, cache, varredura
+  exchange:
+    if: contains(inputs.cenas, 'exchange')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/setup-render.sh
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: venv do Exchange, Trivy e imagem
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install -q -r exchange/requirements-dev.txt
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.1/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.76.1
+          trivy image --download-db-only --quiet
+          docker build -q -t exchange:scan exchange
+      - name: grava
+        run: |
+          mkdir -p casts videos
+          for c in tests cache security; do
+            python3 scripts/rec.py casts/exchange-$c.cast 112 26 bash scripts/demo_exchange.sh $c
+            bash scripts/render.sh casts/exchange-$c.cast videos/exchange-$c.mp4 27 3
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: exchange
+          path: |
+            videos/*.mp4
+            casts/
+
+  # ---------------------------------------------------------------- Kubernetes + HPA
+  k8s:
+    if: contains(inputs.cenas, 'k8s')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/setup-render.sh
+      - name: HTTPie
+        run: |
+          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q httpie
+          echo /tmp/venv/bin >> "$GITHUB_PATH"
+      - uses: helm/kind-action@v1.15.1
+        with:
+          version: v0.33.0
+          cluster_name: store
+          config: k8s/kind.yaml
+      - name: metrics-server, imagem do exchange e Secrets
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.1/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          docker build -q -t exchange:local exchange
+          kind load docker-image exchange:local --name store
+          sed -i 's#image: DOCKERHUB_USER/exchange:latest#image: exchange:local#; s#imagePullPolicy: Always#imagePullPolicy: IfNotPresent#' k8s/exchange.yaml
+          pass=$(openssl rand -hex 12); echo "::add-mask::$pass"
+          kubectl create secret generic account-secrets --from-literal=ACCOUNT_ADMIN_EMAIL=admin@store.dev \
+            --from-literal=ACCOUNT_ADMIN_HASH="$(printf '%s' "$pass" | openssl dgst -sha256 -binary | base64)"
+          kubectl create secret generic auth-secrets --from-literal=JWT_SECRET_KEY="$(openssl rand -base64 32)"
+      - name: grava o deploy
+        run: |
+          mkdir -p casts videos
+          python3 scripts/rec.py casts/k8s.cast 112 26 bash scripts/demo_k8s.sh
+          bash scripts/render.sh casts/k8s.cast videos/k8s.mp4 27 2
+      - name: grava o HPA
+        run: |
+          kubectl apply -f k8s/hpa-gateway.yaml
+          for i in $(seq 1 40); do kubectl top pods -l app=gateway >/dev/null 2>&1 && break; sleep 5; done
+          bash scripts/demo_hpa.sh
+          bash scripts/render.sh casts/hpa.cast videos/hpa.mp4 20 3
+          kubectl get hpa,pods
+      - if: failure()
+        run: kubectl get pods -A; kubectl describe pods | tail -60
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: k8s
+          path: |
+            videos/*.mp4
+            casts/
+
+  # ---------------------------------------------------------------- site da documentação
+  docs:
+    if: contains(inputs.cenas, 'docs')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: grava
+        run: |
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+          pip install -q -r docs-site/requirements.txt playwright
+          playwright install --with-deps chromium >/dev/null
+          (cd docs-site && NO_MKDOCS_2_WARNING=1 mkdocs serve -a 127.0.0.1:8000 >/tmp/mkdocs.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/store-pma-docs/ >/dev/null && break; sleep 2; done
+          python scripts/browser.py docs
+          ffmpeg -loglevel error -y -i videos/docs.webm -c:v libx264 -crf 18 -pix_fmt yuv420p videos/docs.mp4
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: docs
+          path: videos/*.mp4

@@ -1,0 +1,91 @@
+# Mesmo store do EP-PC/store-pma (api/compose.yaml), mas com as imagens publicadas no Docker Hub
+# (as mesmas tags dos k8s.yaml que rodam no EKS) em vez de buildar o Java. O exchange é buildado
+# daqui. Só o gateway publica porta; Prometheus e Grafana ficam de pé para a cena do painel.
+name: store
+
+services:
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: store
+      POSTGRES_DB: store
+
+  account:
+    image: pedrohmm1/account:51f0491
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: store
+      DATABASE_USERNAME: store
+      DATABASE_PASSWORD: store
+      ACCOUNT_ADMIN_EMAIL: ${ACCOUNT_ADMIN_EMAIL:?}
+      ACCOUNT_ADMIN_HASH: ${ACCOUNT_ADMIN_HASH:?}
+    depends_on: [db]
+
+  auth:
+    image: pedrohmm1/auth:1b67b55
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?}
+      JWT_DURATION: 3600000
+      JWT_HTTP_ONLY: "true"
+      # demo em http://localhost: cookie sem a flag Secure (como no EKS sem HTTPS)
+      JWT_COOKIE_SECURE: "false"
+    depends_on: [account]
+
+  product:
+    image: pedrohmm1/product:f559294
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: store
+      DATABASE_USERNAME: store
+      DATABASE_PASSWORD: store
+    depends_on: [db]
+
+  order-redis:
+    image: redis:7.4-alpine
+
+  order:
+    image: enzoperego/order:1eb5bd1
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: store
+      DATABASE_USERNAME: store
+      DATABASE_PASSWORD: store
+      REDIS_HOST: order-redis
+    depends_on: [db, product, order-redis]
+
+  exchange:
+    build: ./exchange
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1d
+    ports:
+      - 9090:9090
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    ports:
+      - 3000:3000
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: dark
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+
+  gateway:
+    image: pedrohmm1/gateway:3
+    ports:
+      - 8080:8080
+    depends_on: [auth, account, product, order, exchange]

@@ -1,0 +1,25 @@
+# HPA do gateway (load test do projeto): equivale ao comando da pagina do professor
+#   kubectl autoscale deployment gateway --cpu-percent=50 --min=1 --max=10
+# so que versionado. Escala pela CPU media dos pods em relacao ao REQUEST (250m no k8s.yaml do gateway):
+# acima de 50% (~125m por pod) cria replicas; abaixo, remove (depois de 5 min de estabilizacao, padrao).
+# max 6 (e nao 10): o cluster tem 2 nos t3.medium (4 vCPU) e nao tem cluster autoscaler; replicas
+# alem do que cabe ficariam Pending. Precisa do metrics-server (add-on no aws/eks.yaml).
+# Aplicar: kubectl apply -f load-test/hpa-gateway.yaml   |   Remover: kubectl delete hpa gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

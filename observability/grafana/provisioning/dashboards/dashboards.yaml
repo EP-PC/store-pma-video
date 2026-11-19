@@ -1,0 +1,10 @@
+# Carrega os paineis da pasta /var/lib/grafana/dashboards (arquivos .json versionados no Git).
+apiVersion: 1
+
+providers:
+  - name: store
+    folder: Store
+    type: file
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards

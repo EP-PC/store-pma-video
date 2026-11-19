@@ -1,0 +1,11 @@
+# Prometheus do store (bottleneck 2 do order: observabilidade).
+# Coleta as metricas do order na porta de management (8081), que so existe na rede interna.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: order
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["order:8081"]

@@ -1,0 +1,11 @@
+# Configuração não sensível do banco no Kubernetes (Minikube).
+# Usada pelo Deployment do postgres e pelos serviços (account, product) para montar DATABASE_HOST/DB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-configmap
+  labels:
+    app: postgres
+data:
+  POSTGRES_HOST: postgres
+  POSTGRES_DB: store

@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exchange
+  template:
+    metadata:
+      labels:
+        app: exchange
+    spec:
+      securityContext:
+        # a imagem roda como o usuário 10001 (Dockerfile): o Kubernetes recusa subir como root
+        runAsNonRoot: true
+      containers:
+          - name: exchange
+            # a tag é o commit do código (imagem publicada para linux/amd64 e linux/arm64)
+            image: DOCKERHUB_USER/exchange:latest
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+            # o site pede que as probes chamem GET /<serviço>/health-check (200 sem login e sem
+            # expor nada interno). O uvicorn sobe em ~1 s, então o atraso inicial é curto.
+            readinessProbe:
+              httpGet:
+                path: /exchange/health-check
+                port: 8080
+              initialDelaySeconds: 5
+              periodSeconds: 5
+            livenessProbe:
+              httpGet:
+                path: /exchange/health-check
+                port: 8080
+              initialDelaySeconds: 15
+              periodSeconds: 20
+            # Python sem JVM: bem menos memória que os serviços Java (256Mi-512Mi)
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "200m"
+            env:
+              # PTAX do Banco Central: público, sem chave (nenhum Secret necessário)
+              - name: PTAX_TIMEOUT
+                value: "1.5"
+              # bottleneck 1 (cache): cotação reaproveitada por 5 min; se o PTAX cair, serve a
+              # última cotação por até 24 h e tenta de novo a cada 30 s
+              - name: CACHE_SECONDS
+                value: "300"
+              - name: RETRY_SECONDS
+                value: "30"
+              - name: MAX_STALE_SECONDS
+                value: "86400"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange
+spec:
+  selector:
+    app: exchange
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
