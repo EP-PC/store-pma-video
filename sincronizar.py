@@ -128,7 +128,7 @@ def cenas():
     yield ("anim", "Abertura", INICIO, b2,
            [w("esse") - 0.1, w("eu", "sou"), w("e", "uma", "l")])
     yield ("anim", "Arquitetura", b2, b3,
-           [w("gateway"), w("ele", depois=16), w("atras"), w("exchange", depois=23) - 0.3,
+           [w("a", "entrada") - 0.6, w("ele", depois=16), w("atras"), w("exchange", depois=23) - 0.3,
             w("na", "aws"), w("jenkins") - 0.3])
 
     sem, barra, se_tentar = w("sem", "login"), w("barra"), w("se", "tentar")
@@ -148,9 +148,9 @@ def cenas():
 
     pods, responde = w("pods"), w("responde")
     yield ("real", "k8s.mp4", "gravação real · os k8s.yaml do EKS num cluster kind", [
-        (b4, pods, 17.0, 21.0),                  # as probes / kubectl get pods
-        (pods, responde + 0.3, 60.0, 72.5),      # pods ficando prontos
-        (responde + 0.3, b4h, 72.5, 74.0),
+        (b4, pods, 17.1, 20.8),                  # as probes / kubectl get pods
+        (pods, responde + 0.3, 52.0, 62.7),      # pods ficando prontos (todos 1/1 aos ~62,5 s)
+        (responde + 0.3, b4h, 62.7, 64.3),
     ])
     cpu, alvo, quatro = w("cpu"), w("alvo"), w("quatro")
     yield ("real", "hpa.mp4", "gravação real · HPA do gateway sob carga", [
@@ -167,7 +167,7 @@ def cenas():
 
     q800, q4 = w("800"), w("4", depois=95)
     yield ("real", "exchange-cache.mp4", "gravação real · cache do exchange", [
-        (b7, q800, 0.5, 8.4),                    # sem cache: 820 ms no "800"
+        (b7, q800, 2.6, 8.4),                    # sem cache: 820 ms no "800"
         (q800, q4, 10.9, 16.4),                  # com cache: 4 ms no "4"
         (q4, b7s, 16.4, 19.2),
     ])
@@ -255,7 +255,7 @@ def main():
             _, fonte, selo, trechos = cena
             for j, (n0, n1, c0, c1) in enumerate(trechos):
                 dst = PARTES / f"v{k:02d}.mp4"; k += 1
-                vel = peca_real(REAL / fonte, n0, n1, c0, c1, selo, j == 0, j == len(trechos) - 1, dst)
+                vel = peca_real(REAL / fonte, n0, n1, c0, c1, selo, False, False, dst)
                 if vel is None:
                     k -= 1
                     continue
@@ -265,7 +265,12 @@ def main():
     lista = PARTES / "video.txt"
     lista.write_text("".join(f"file '{p.name}'\n" for p in pecas), encoding="utf-8")
     mudo = OUT / "mudo.mp4"
-    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(mudo)])
+    junto = OUT / "junto.mp4"
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(junto)])
+    # só o fim do vídeo escurece (0,6 s); entre as cenas o corte é seco
+    d = dur(junto)
+    run(["ffmpeg", "-y", "-i", str(junto), "-vf", f"fade=out:st={d - 0.6:.3f}:d=0.6:color={FUNDO}",
+         "-c:v", "libx264", "-preset", "medium", "-crf", "18", str(mudo)])
     voz = audio(original)
     final = OUT / "store-pma-final.mp4"
     run(["ffmpeg", "-y", "-i", str(mudo), "-i", str(voz), "-map", "0:v", "-map", "1:a",

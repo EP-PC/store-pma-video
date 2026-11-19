@@ -71,14 +71,14 @@ class Abertura(Aula):
         rod = t("Grupo 05 · Platforms, Microservices, DevOps and APIs · Insper 2026.2", 22, APAGADO)
         VGroup(tit, nomes, sub).arrange(DOWN, buff=0.5).shift(UP * 0.3)
         rod.to_edge(DOWN, buff=0.6)
+        self.add(tit, rod)
         ate(self, m[0])
-        self.play(Write(tit), FadeIn(rod), run_time=1.2)
+        self.play(Indicate(tit, color=AZUL, scale_factor=1.04), run_time=0.8)
         ate(self, m[1])
         self.play(FadeIn(nomes, shift=UP * 0.1), run_time=0.6)
         ate(self, m[2])
         self.play(FadeIn(sub, shift=UP * 0.1), run_time=0.6)
-        folga(self)
-        self.limpa()
+        folga(self, 0.0)
 
 
 class Arquitetura(Aula):
@@ -110,9 +110,9 @@ class Arquitetura(Aula):
         s_oe = CurvedArrow(order.get_left() + LEFT * 0.05, exchange.get_left() + LEFT * 0.05,
                            angle=PI / 1.6, color=AMAR, stroke_width=3, tip_length=0.15)
 
-        self.play(FadeIn(tit), run_time=0.4)
+        self.add(tit, cliente)
         ate(self, m[0])  # "a entrada é um gateway"
-        self.play(FadeIn(cliente), GrowArrow(s_cg), FadeIn(gw), run_time=0.8)
+        self.play(GrowArrow(s_cg), FadeIn(gw), run_time=0.6)
         leg = legenda(self, None, "o gateway é o único serviço exposto")
         ate(self, m[1])  # "valida o login com o auth"
         self.play(GrowArrow(s_gs[0]), FadeIn(auth, shift=RIGHT * 0.1), run_time=0.6)
@@ -148,8 +148,7 @@ class Arquitetura(Aula):
         self.play(FadeOut(leg), run_time=0.2)
         self.play(LaggedStart(*[FadeIn(p) for p in pipe], lag_ratio=0.35),
                   LaggedStart(*[GrowArrow(s) for s in s_pipe], lag_ratio=0.35), run_time=1.4)
-        folga(self)
-        self.limpa()
+        folga(self, 0.0)
 
 
 class Gargalos(Aula):
@@ -157,7 +156,7 @@ class Gargalos(Aula):
 
     def roteiro(self):
         m = marcas([0.3, 2.5, 5.0, 7.5, 10.0])
-        self.titulo("bottlenecks · 2 por integrante", AMAR, 38)
+        self.add(t("bottlenecks · 2 por integrante", 38, AMAR).to_edge(UP, buff=0.7))
         dados = [
             ("Pedro Machado", ("HPA no gateway", "p95  770 → 320 ms"), ("readinessProbe", "deploy sem 40 s de erro")),
             ("Enzo Perego", ("Redis no order", "p50  335 → 10 ms"), ("Prometheus + Grafana", "p95 por rota, acerto do cache")),
@@ -188,8 +187,7 @@ class Gargalos(Aula):
         self.play(FadeIn(linhas[1][1], shift=RIGHT * 0.1), FadeIn(linhas[1][2], shift=RIGHT * 0.1), run_time=0.6)
         ate(self, m[4])  # adianta a linha do exchange (bloco seguinte)
         self.play(FadeIn(linhas[2][1], shift=RIGHT * 0.1), FadeIn(linhas[2][2], shift=RIGHT * 0.1), run_time=0.6)
-        folga(self)
-        self.limpa()
+        folga(self, 0.0)
 
 
 class Nuvem(Aula):
@@ -197,7 +195,7 @@ class Nuvem(Aula):
 
     def roteiro(self):
         m = marcas([1.5, 4.0, 6.5])
-        self.titulo("quanto custa e quanto aguenta", TINTA, 38)
+        self.add(t("quanto custa e quanto aguenta", 38).to_edge(UP, buff=0.7))
         grande = t("US$ 0,34 / hora", 64, VERDE)
         l1 = t("EKS + 2 nós t3.medium + 2 NAT + Load Balancer + RDS db.t4g.micro", 26, APAGADO)
         l2 = t("~US$ 250/mês se ficasse ligado: sobe e derruba com aws/up.ps1 e aws/down.ps1", 26, APAGADO)
@@ -209,8 +207,7 @@ class Nuvem(Aula):
         self.play(FadeIn(l2), run_time=0.5)
         ate(self, m[2])  # "o ponto fraco..."
         self.play(FadeIn(sla, shift=UP * 0.1), run_time=0.5)
-        folga(self)
-        self.limpa()
+        folga(self, 0.0)
 
 
 class Fecho(Aula):
@@ -224,9 +221,9 @@ class Fecho(Aula):
             t("próximos passos: banco em várias zonas · mais réplicas · autoscaling do cluster", 26, AMAR),
             t("documentação: garciapp2.github.io/store-pma-docs", 26, AZUL),
         ).arrange(DOWN, buff=0.5)
+        self.add(g[0])
         ate(self, m[0])  # "a loja funciona de ponta a ponta"
-        self.play(Write(g[0]), FadeIn(g[1]), run_time=1.0)
+        self.play(Indicate(g[0], color=VERDE, scale_factor=1.04), FadeIn(g[1]), run_time=0.8)
         ate(self, m[1])  # "os próximos passos são..."
         self.play(FadeIn(g[2:], lag_ratio=0.3), run_time=0.8)
-        folga(self, 0.8)
-        self.play(FadeOut(g), run_time=0.8)
+        folga(self, 0.0)
