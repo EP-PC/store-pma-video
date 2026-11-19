@@ -30,10 +30,10 @@ BLOCOS = [
     [("anim", "Abertura", 1.0, None, None, None)],
     [("anim", "Arquitetura", 1.0, None, None, None)],
     [("real", "app.mp4", 1.0, 8.0, 71.0, "gravação real · loja completa no docker compose")],
-    [("real", "k8s.mp4", 0.35, 50.0, 76.0, "gravação real · os k8s.yaml do EKS num cluster kind"),
-     ("real", "hpa.mp4", 0.65, 35.0, 85.0, "gravação real · HPA do gateway sob carga")],
+    [("real", "k8s.mp4", 0.35, 56.0, 76.0, "gravação real · os k8s.yaml do EKS num cluster kind"),
+     ("real", "hpa.mp4", 0.65, 40.0, 80.0, "gravação real · HPA do gateway sob carga")],
     [("anim", "Gargalos", 1.0, None, None, None)],
-    [("real", "grafana.mp4", 1.0, 50.0, 81.0, "gravação real · Grafana do order")],
+    [("real", "grafana.mp4", 1.0, 58.0, 81.0, "gravação real · Grafana do order")],
     [("real", "exchange-cache.mp4", 0.5, 0.0, 19.5, "gravação real · cache do exchange"),
      ("real", "exchange-security.mp4", 0.5, 21.0, 40.5, "gravação real · Trivy antes e depois")],
     [("anim", "Nuvem", 1.0, None, None, None)],
@@ -58,8 +58,8 @@ def blocos_de_uma_tomada(audio):
     err = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(audio), "-af",
                           "silencedetect=noise=-35dB:d=1.0", "-f", "null", "-"],
                          capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
-    ini = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
-    fim = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
+    ini = [max(0.0, float(x)) for x in re.findall(r"silence_start: (-?[\d.]+)", err)]
+    fim = [float(x) for x in re.findall(r"silence_end: (-?[\d.]+)", err)]
     total = dur(audio)
     pausas = [(b - a, a, b) for a, b in zip(ini, fim) if a > 0.5 and b < total - 0.5]
     if len(pausas) < 8:
