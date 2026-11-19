@@ -86,7 +86,9 @@ jobs:
           /tmp/venv/bin/pip install -q -r exchange/requirements-dev.txt
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.1/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.76.1
           trivy image --download-db-only --quiet
+          docker build -q -t exchange:antes -f exchange/Dockerfile.antes exchange
           docker build -q -t exchange:scan exchange
+          trivy image --quiet --format json --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed exchange:scan | jq -r '.Results[] | select(.Vulnerabilities) | .Target as $t | .Vulnerabilities[] | [$t, .PkgName, .PkgPath, .VulnerabilityID] | @tsv'
       - name: grava
         run: |
           mkdir -p casts videos

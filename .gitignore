@@ -5,3 +5,5 @@ __pycache__/
 .env
 anim/media/
 anim/__pycache__/
+gravacoes/
+saida/

@@ -33,11 +33,13 @@ security)
   title "Exchange · bottleneck 2: varredura de vulnerabilidades"
   note "dependências antigas (fastapi 0.109): o pipeline tem que parar"
   run "printf 'fastapi==0.109.0\nuvicorn==0.27.0\nhttpx==0.26.0\n' > /tmp/antigas.txt"  0.5
-  run "pip-audit -r /tmp/antigas.txt" 4
+  run "pip-audit --progress-spinner off -r /tmp/antigas.txt" 4
   note "dependências atuais, fixadas no requirements.txt"
-  run "pip-audit -r requirements.txt" 3
-  note "Trivy na imagem final: barra HIGH/CRITICAL com correção disponível"
-  run "trivy image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 exchange:scan; echo \"exit code: \$?\"" 4
+  run "pip-audit --progress-spinner off -r requirements.txt" 3
+  note "Trivy na imagem como estava: barra HIGH/CRITICAL com correção disponível"
+  run "trivy image --quiet --table-mode detailed --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 exchange:antes; echo \"exit code: \$?\"" 4
+  note "corrigido no Dockerfile: apt-get upgrade (patch do Debian) + setuptools atualizado"
+  run "trivy image --quiet --table-mode detailed --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 exchange:scan; echo \"exit code: \$?\"" 4
   ;;
 
 esac
