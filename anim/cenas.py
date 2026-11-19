@@ -5,7 +5,18 @@
 
 Cada cena tem duração fixa, combinada com o roteiro (ROTEIRO.md).
 """
+import os
+
 from base_video import *
+
+
+def folga(cena, fim=0.5):
+    """Espera o que falta para a cena durar ALVO segundos (a duração do trecho narrado)."""
+    alvo = float(os.environ.get("ALVO", "0") or 0)
+    if alvo:
+        resto = alvo - cena.renderer.time - fim
+        if resto > 0.05:
+            cena.wait(resto)
 
 CINZA = "#2A2E33"
 
@@ -39,6 +50,7 @@ class Abertura(Aula):
         self.play(FadeIn(sub, shift=UP * 0.1), run_time=0.7)
         self.play(FadeIn(nomes), FadeIn(rod), run_time=0.7)
         self.wait(3.7)
+        folga(self)
         self.limpa()
 
 
@@ -116,6 +128,7 @@ class Arquitetura(Aula):
         self.play(LaggedStart(*[FadeIn(p) for p in pipe], lag_ratio=0.35),
                   LaggedStart(*[GrowArrow(s) for s in s_pipe], lag_ratio=0.35), run_time=1.6)
         self.wait(2.6)
+        folga(self)
         self.limpa()
 
 
@@ -127,7 +140,7 @@ class Gargalos(Aula):
         linhas = [
             ("Pedro", "HPA no gateway", "p95  770 → 320 ms", "readinessProbe", "deploy sem 40 s de 503"),
             ("Enzo", "Redis no order", "p50  335 → 10 ms", "Prometheus + Grafana", "p95 por rota, acerto do cache"),
-            ("Pedro Garcia", "cache no exchange", "p50  234 → 3,7 ms", "pip-audit + Trivy", "15 → 0 vulnerabilidades"),
+            ("Pedro Garcia", "cache no exchange", "chamadas ao PTAX  101 → 2", "pip-audit + Trivy", "imagem barrada → corrigida"),
         ]
         rows = VGroup()
         for nome, b1, n1, b2, n2 in linhas:
@@ -153,6 +166,7 @@ class Gargalos(Aula):
                 self.play(Create(linhas_sep[i]), run_time=0.3)
             self.wait(1.9)
         self.wait(1.4)
+        folga(self)
         self.limpa()
 
 
@@ -172,6 +186,7 @@ class Nuvem(Aula):
         self.wait(1.6)
         self.play(FadeIn(sla, shift=UP * 0.1), run_time=0.6)
         self.wait(2.6)
+        folga(self)
         self.limpa()
 
 
@@ -188,4 +203,5 @@ class Fecho(Aula):
         self.play(Write(g[0]), run_time=1.2)
         self.play(FadeIn(g[1:], lag_ratio=0.35), run_time=1.2)
         self.wait(3.8)
+        folga(self, 0.8)
         self.play(FadeOut(g), run_time=0.8)

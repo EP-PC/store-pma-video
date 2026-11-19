@@ -104,10 +104,13 @@ jobs:
       - name: grava
         run: |
           mkdir -p casts videos
-          for c in tests cache security; do
+          for c in tests cache; do
             python3 scripts/rec.py casts/exchange-$c.cast 112 26 bash scripts/demo_exchange.sh $c
             bash scripts/render.sh casts/exchange-$c.cast videos/exchange-$c.mp4 27 3
           done
+          # a tabela do Trivy é larga: terminal de 150 colunas e fonte menor
+          python3 scripts/rec.py casts/exchange-security.cast 150 34 bash scripts/demo_exchange.sh security
+          bash scripts/render.sh casts/exchange-security.cast videos/exchange-security.mp4 20 3
       - uses: actions/upload-artifact@v7
         if: always()
         with:
