@@ -143,7 +143,7 @@ jobs:
             -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
           docker build -q -t exchange:local exchange
           kind load docker-image exchange:local --name store
-          sed -i 's#image: DOCKERHUB_USER/exchange:latest#image: exchange:local#; s#imagePullPolicy: Always#imagePullPolicy: IfNotPresent#' k8s/exchange.yaml
+          sed -i 's#image: garciapp/exchange:latest#image: exchange:local#; s#imagePullPolicy: Always#imagePullPolicy: IfNotPresent#' k8s/exchange.yaml
           pass=$(openssl rand -hex 12); echo "::add-mask::$pass"
           kubectl create secret generic account-secrets --from-literal=ACCOUNT_ADMIN_EMAIL=admin@store.dev \
             --from-literal=ACCOUNT_ADMIN_HASH="$(printf '%s' "$pass" | openssl dgst -sha256 -binary | base64)"

@@ -17,8 +17,9 @@ spec:
         runAsNonRoot: true
       containers:
           - name: exchange
-            # a tag é o commit do código (imagem publicada para linux/amd64 e linux/arm64)
-            image: DOCKERHUB_USER/exchange:latest
+            # última imagem publicada no Docker Hub (linux/amd64 e linux/arm64), pelo Jenkins ou pelo
+            # workflow .github/workflows/imagem.yml; o deploy do Jenkins troca para a tag do build
+            image: garciapp/exchange:latest
             imagePullPolicy: Always
             ports:
               - containerPort: 8080
