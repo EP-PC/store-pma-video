@@ -219,7 +219,7 @@ class Fecho(Aula):
             t("funcionando de ponta a ponta", 46, VERDE),
             t("compose · Minikube · EKS  ·  CI/CD com Jenkins  ·  HPA  ·  6 bottlenecks medidos", 26, APAGADO),
             t("próximos passos: banco em várias zonas · mais réplicas · autoscaling do cluster", 26, AMAR),
-            t("documentação: garciapp2.github.io/store-pma-docs", 26, AZUL),
+            t("documentação: ep-pc.github.io/store-pma-docs", 26, AZUL),
         ).arrange(DOWN, buff=0.5)
         self.add(g[0])
         ate(self, m[0])  # "a loja funciona de ponta a ponta"
